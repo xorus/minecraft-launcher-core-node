@@ -260,7 +260,6 @@ Consider support him to maintains forge.
 
 Fetch the new fabric version list.
 
-
 ```ts
     import { Fabric } from 'ts-minecraft'
     const minecraftLocation: MinecraftLocation;
