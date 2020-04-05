@@ -1,5 +1,5 @@
 /**
- * Provide function to {@link parse} the options.txt and also {@link stringify} it into the string. 
+ * Provide function to {@link parse} the options.txt and also {@link stringify} it into the string.
  *
  * @packageDocumentation
  */
