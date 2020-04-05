@@ -5,7 +5,7 @@ import { HttpsAgent } from "agentkeepalive";
 import got from "got";
 import { basename, join } from "path";
 import { DownloaderOption } from "./minecraft";
-import { batchedTask, downloadFileTask, normailzeDownloader } from "./util";
+import { batchedTask, downloadFileTask, normailzeDownloader, createErr } from "./util";
 
 export interface Options extends DownloaderOption {
     /**
@@ -79,7 +79,7 @@ export function readManifestTask(zip: InputType) {
         let zipFile = typeof zip === "string" || zip instanceof Buffer ? await open(zip) : zip;
         let mainfiestEntry = zipFile.entries["manifest.json"];
         if (!mainfiestEntry) {
-            throw { error: "InvalidModpack", modpack: zip };
+            throw createErr({ error: "BadCurseforgeModpack", entry: "manifest.json" });
         }
         let buffer = await zipFile.readEntry(mainfiestEntry)
         let content: Manifest = JSON.parse(buffer.toString());

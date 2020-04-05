@@ -295,6 +295,9 @@ export class MultipleError extends Error {
     constructor(public errors: unknown[], message?: string) { super(message); };
 }
 
+/**
+ * The options pass into the {@link Downloader}.
+ */
 export interface DownloaderOptions {
     /**
      * An customized downloader to swap default downloader.
@@ -320,4 +323,80 @@ export interface DownloaderOptions {
      * The max concurrency of the download
      */
     maxConcurrency?: number;
+}
+
+export interface PostProcessFailedError {
+    error: "PostProcessFailed";
+    jar: string;
+    commands: string[];
+}
+export interface PostProcessNoMainClassError {
+    error: "PostProcessNoMainClass";
+    jarPath: string;
+}
+export interface PostProcessBadJarError {
+    error: "PostProcessBadJar";
+    jarPath: string;
+    causeBy: Error;
+}
+export interface BadForgeInstallerJarError {
+    error: "BadForgeInstallerJar";
+    /**
+     * What entry in jar is missing
+     */
+    entry: string;
+}
+export interface BadForgeUniversalJarError {
+    error: "BadForgeUniversalJar";
+    /**
+     * What entry in jar is missing
+     */
+    entry: string;
+}
+export interface BadOptifineJarError {
+    error: "BadOptifineJar";
+    /**
+     * What entry in jar is missing
+     */
+    entry: string;
+}
+/**
+ * This error is only thrown from liteloader install currently.
+ */
+export interface MissingVersionJsonError {
+    error: "MissingVersionJson";
+    version: string;
+    /**
+     * The path of version json
+     */
+    path: string;
+}
+export interface BadCurseforgeModpackError {
+    error: "BadCurseforgeModpack";
+    /**
+     * What required entry is missing in modpack.
+     */
+    entry: string;
+}
+
+type _InstallerError = BadCurseforgeModpackError | MissingVersionJsonError | BadOptifineJarError | PostProcessFailedError | PostProcessNoMainClassError | PostProcessBadJarError | BadForgeInstallerJarError | BadForgeUniversalJarError;
+/**
+ * The general installer error type. You should cast your error into this type and match the error.
+ *
+ * ```ts
+ *  try {
+ *   someFunc();
+ *  } catch (e) {
+ *   if (e instanceof Error) {
+ *     let err = e as InstallerError;
+ *     switch
+ *   }
+ *  }
+ * ```
+ */
+export type InstallerError = Error & (BadCurseforgeModpackError | MissingVersionJsonError | BadOptifineJarError | PostProcessFailedError | PostProcessNoMainClassError | PostProcessBadJarError | BadForgeInstallerJarError | BadForgeUniversalJarError);
+
+export function createErr<T extends _InstallerError>(error: T, message?: string): T & Error {
+    let err = new Error(message);
+    return Object.assign(err, error);
 }

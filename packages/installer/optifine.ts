@@ -2,7 +2,7 @@ import { futils, MinecraftFolder, MinecraftLocation, Version } from "@xmcl/core"
 import { Task, task } from "@xmcl/task";
 import { open } from "@xmcl/unzip";
 import { ClassReader, ClassVisitor, Opcodes } from "java-asm";
-import { InstallOptions, spawnProcess } from "./util";
+import { InstallOptions, spawnProcess, createErr } from "./util";
 
 const { writeFile, ensureFile } = futils;
 
@@ -75,12 +75,12 @@ export function installByInstallerTask(installer: string, minecraft: MinecraftLo
 
         let entry = zip.entries["net/optifine/Config.class"];
         if (!entry) {
-            throw new Error();
+            throw createErr({ error: "BadOptifineJar", entry: "net/optifine/Config.class" });
         }
 
         let launchWrapperVersionEntry = zip.entries["launchwrapper-of.txt"];
         if (!launchWrapperVersionEntry) {
-            throw new Error();
+            throw createErr({ error: "BadOptifineJar", entry: "launchwrapper-of.txt" });
         }
 
         let launchWrapperVersion = await zip.readEntry(launchWrapperVersionEntry).then((b) => b.toString());
@@ -88,7 +88,7 @@ export function installByInstallerTask(installer: string, minecraft: MinecraftLo
 
         const launchWrapperEntry = zip.entries[`launchwrapper-of-${launchWrapperVersion}.jar`]
         if (!launchWrapperEntry) {
-            throw new Error();
+            throw createErr({ error: "BadOptifineJar", entry: `launchwrapper-of-${launchWrapperVersion}.jar` });
         }
 
         let buf = await zip.readEntry(entry);

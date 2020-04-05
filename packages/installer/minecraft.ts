@@ -1,8 +1,8 @@
 import { futils, LibraryInfo, MinecraftFolder, MinecraftLocation, ResolvedLibrary, ResolvedVersion, Version as VersionJson } from "@xmcl/core";
 import { Task, task } from "@xmcl/task";
-import { open } from "@xmcl/unzip";
+import { open, LazyZipFile } from "@xmcl/unzip";
 import { delimiter, join } from "path";
-import { batchedTask, DownloaderOptions, downloadFileTask, getIfUpdate, HasDownloader, joinUrl, normailzeDownloader, normalizeArray, spawnProcess, UpdatedObject } from "./util";
+import { batchedTask, DownloaderOptions, downloadFileTask, getIfUpdate, HasDownloader, joinUrl, normailzeDownloader, normalizeArray, spawnProcess, UpdatedObject, createErr } from "./util";
 
 const { ensureDir, readFile, validateSha1 } = futils;
 
@@ -519,7 +519,12 @@ export function postProcess(processors: InstallProfile["processors"], minecraft:
  */
 export function postProcessTask(processors: InstallProfile["processors"], minecraft: MinecraftFolder, java: string) {
     async function findMainClass(lib: string) {
-        const zip = await open(lib, { lazyEntries: true });
+        let zip: LazyZipFile;
+        try {
+            zip = await open(lib, { lazyEntries: true });
+        } catch (e) {
+            throw createErr({ error: "PostProcessBadJar", jarPath: lib, causeBy: e });
+        }
         const [manifest] = await zip.filterEntries(["META-INF/MANIFEST.MF"]);
         let mainClass: string | undefined;
         if (manifest) {
@@ -529,6 +534,9 @@ export function postProcessTask(processors: InstallProfile["processors"], minecr
                 .find((arr) => arr[0] === "Main-Class")?.[1].trim();
         }
         zip.close();
+        if (!mainClass) {
+            throw createErr({ error: "PostProcessNoMainClass", jarPath: lib })
+        }
         return mainClass;
     }
     async function postProcess(mc: MinecraftFolder, proc: InstallProfile["processors"][number], java: string) {
@@ -544,15 +552,17 @@ export function postProcessTask(processors: InstallProfile["processors"], minecr
             shouldProcess = true;
         }
         if (!shouldProcess) { return; }
-        const jarRealPath = mc.getLibraryByPath(LibraryInfo.resolve(proc.jar).path);
-        const mainClass = await findMainClass(jarRealPath);
-        if (!mainClass) { throw new Error(`Cannot find main class for processor ${proc.jar}.`); }
-        const cp = [...proc.classpath, proc.jar].map(LibraryInfo.resolve).map((p) => mc.getLibraryByPath(p.path)).join(delimiter);
-        const cmd = ["-cp", cp, mainClass, ...proc.args];
+        let jarRealPath = mc.getLibraryByPath(LibraryInfo.resolve(proc.jar).path);
+        let mainClass = await findMainClass(jarRealPath);
+        let cp = [...proc.classpath, proc.jar].map(LibraryInfo.resolve).map((p) => mc.getLibraryByPath(p.path)).join(delimiter);
+        let cmd = ["-cp", cp, mainClass, ...proc.args];
         try {
             await spawnProcess(java, cmd);
         } catch (e) {
-            throw new Error(`Fail on execute processor ${proc.jar}: ${JSON.stringify(cmd)}\n stderr: ${e}`)
+            if (typeof e === "string") {
+                throw createErr({ error: "PostProcessFailed", jar: proc.jar, commands: [java, ...cmd] }, e);
+            }
+            throw e;
         }
     }
     return task("postProcessing", async function postProcessing(ctx) {
@@ -563,12 +573,7 @@ export function postProcessTask(processors: InstallProfile["processors"], minecr
         ctx.update(0, processors.length);
         let done = 0;
         for (let proc of processors) {
-            try {
-                await postProcess(minecraft, proc, java);
-            } catch (e) {
-                e = e || new Error(`Fail to post porcess ${proc.jar}: ${proc.args.join(" ")}, ${proc.classpath.join(" ")}`);
-                throw e;
-            }
+            await postProcess(minecraft, proc, java);
             ctx.update(done += 1, processors.length);
         }
 
